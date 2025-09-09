@@ -35,7 +35,8 @@ type ValidateResp = {
 };
 
 function InnerForm() {
-  const { postcode, suburb, state, setField } = useFormStore();
+  // NOTE: read _hasHydrated to avoid SSR/CSR mismatch
+  const { postcode, suburb, state, setField, _hasHydrated } = useFormStore();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [last, setLast] = useState<{ success: boolean; message?: string; lat?: number; lng?: number } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -47,7 +48,7 @@ function InnerForm() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (loading) return; // guard double submit
+    if (loading) return; // double-submit guard
 
     setErrors({});
     setNetErr(null);
@@ -79,7 +80,7 @@ function InnerForm() {
       if (myReq === reqIdRef.current) {
         const r = data?.validateAddress;
 
-        // Redirect to login if unauthorized
+        // Redirect if not logged in (per requirements)
         if (r?.message?.toLowerCase().includes('unauthorized')) {
           router.push('/login');
           return;
@@ -97,6 +98,11 @@ function InnerForm() {
     } finally {
       if (myReq === reqIdRef.current) setLoading(false);
     }
+  }
+
+  // Hydration guard: wait until Zustand has rehydrated from localStorage
+  if (!_hasHydrated) {
+    return <div className="text-sm text-gray-500">Loading saved form…</div>;
   }
 
   return (
