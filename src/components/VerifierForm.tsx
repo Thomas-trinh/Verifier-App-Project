@@ -6,6 +6,7 @@ import { makeApolloClient } from '@/lib/apollo-client';
 import { ApolloProvider, useApolloClient } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { z } from 'zod';
+import GoogleMap from '@/components/GoogleMap';
 import { useRouter } from 'next/navigation';
 
 const SCHEMA = z.object({
@@ -149,6 +150,12 @@ function InnerForm() {
         <p className="text-sm">
           {last.success ? 'Valid address' : `${last.message || 'Invalid address'}`}
         </p>
+      )}
+
+      {last && last.success && typeof last.lat === 'number' && typeof last.lng === 'number' && (
+        <div className="mt-3">
+          <GoogleMap lat={last.lat} lng={last.lng} height={360} zoom={14} />
+        </div>
       )}
     </form>
   );
