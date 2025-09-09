@@ -6,6 +6,7 @@ import { makeApolloClient } from '@/lib/apollo-client';
 import { ApolloProvider, useApolloClient } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { z } from 'zod';
+import { useRouter } from 'next/navigation';
 
 const SCHEMA = z.object({
   postcode: z.string().trim().regex(/^\d{4}$/, 'Postcode must be 4 digits'),
@@ -40,17 +41,13 @@ function InnerForm() {
   const [loading, setLoading] = useState(false);
   const [netErr, setNetErr] = useState<string | null>(null);
 
-  // Use Apollo client directly to avoid hook staleness.
   const client = useApolloClient();
-
-  // Request guard to drop out-of-order responses
   const reqIdRef = useRef(0);
+  const router = useRouter();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-
-    // Debounce/double-click guard (prevents racing requests)
-    if (loading) return;
+    if (loading) return; // guard double submit
 
     setErrors({});
     setNetErr(null);
@@ -64,12 +61,11 @@ function InnerForm() {
       return;
     }
 
-    const clean = parsed.data; // suburb/state already UPPERCASE, postcode trimmed
+    const clean = parsed.data;
     const myReq = ++reqIdRef.current;
-
     setLoading(true);
+
     try {
-      // Force uppercase again when sending (defensive)
       const { data } = await client.query<ValidateResp, ValidateVars>({
         query: VALIDATE,
         variables: {
@@ -80,9 +76,15 @@ function InnerForm() {
         fetchPolicy: 'network-only',
       });
 
-      // Only apply if this is the latest request (race-proof UI)
       if (myReq === reqIdRef.current) {
         const r = data?.validateAddress;
+
+        // Redirect to login if unauthorized
+        if (r?.message?.toLowerCase().includes('unauthorized')) {
+          router.push('/login');
+          return;
+        }
+
         setLast({
           success: !!r?.success,
           message: r?.message ?? undefined,
@@ -123,7 +125,7 @@ function InnerForm() {
         <div>
           <input
             className="border rounded p-2 w-full uppercase"
-            placeholder="State (NSW/VIC/QLD/WA/SA/TAS/ACT/NT)"
+            placeholder="State (NSW/VIC/QLD/WA/SA/ACT/NT)"
             value={state}
             onChange={(e) => setField('state', e.target.value)}
           />
