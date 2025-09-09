@@ -1,19 +1,19 @@
+// src/lib/elasticsearch.ts
 import { Client } from '@elastic/elasticsearch';
 
-const node = process.env.ELASTICSEARCH_NODE!;
-const username = process.env.ELASTICSEARCH_USERNAME || undefined;
-const password = process.env.ELASTICSEARCH_PASSWORD || undefined;
-
 export const es = new Client({
-  node,
-  auth: username && password ? { username, password } : undefined,
+  node: process.env.ELASTICSEARCH_NODE!,
+  auth: { apiKey: process.env.ELASTICSEARCH_API_KEY! },
 });
 
+export const USERS_INDEX = process.env.ELASTICSEARCH_USERS_INDEX || 'users';
+export const VERIF_INDEX = process.env.ELASTICSEARCH_VERIF_INDEX || 'verifications';
+
 export async function ensureIndices() {
-  const usersExists = await es.indices.exists({ index: 'users' });
+  const usersExists = await es.indices.exists({ index: USERS_INDEX });
   if (!usersExists) {
     await es.indices.create({
-      index: 'users',
+      index: USERS_INDEX,
       mappings: {
         properties: {
           username: { type: 'keyword' },
@@ -24,19 +24,22 @@ export async function ensureIndices() {
     });
   }
 
-  const verExists = await es.indices.exists({ index: 'verifications' });
-  if (!verExists) {
+  const verifExists = await es.indices.exists({ index: VERIF_INDEX });
+  if (!verifExists) {
     await es.indices.create({
-      index: 'verifications',
+      index: VERIF_INDEX,
       mappings: {
         properties: {
-          username:  { type: 'keyword' },
-          postcode:  { type: 'keyword' },
-          suburb:    { type: 'text'    },
-          state:     { type: 'keyword' },
-          success:   { type: 'boolean' },
-          error:     { type: 'text'    },
-          createdAt: { type: 'date'    },
+          username: { type: 'keyword' },
+          postcode: { type: 'keyword' },
+          suburb: { type: 'keyword' },
+          state: { type: 'keyword' },
+          success: { type: 'boolean' },
+          message: { type: 'text' },
+          error: { type: 'text' },
+          lat: { type: 'float' },
+          lng: { type: 'float' },
+          createdAt: { type: 'date' },
         },
       },
     });

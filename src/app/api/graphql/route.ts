@@ -1,10 +1,11 @@
 import { startServerAndCreateNextHandler } from '@as-integrations/next';
 import { ApolloServer } from '@apollo/server';
 import { gql } from 'graphql-tag';
-import { es } from '@/lib/elasticsearch';
+import type { NextRequest } from 'next/server';
+import { es, ensureIndices, VERIF_INDEX } from '@/lib/elasticsearch';
 import { getSession } from '@/lib/session';
 
-// Fail-fast on missing env
+// Environment (fail fast)
 const AUSPOST_BASE_URL = process.env.AUSPOST_BASE_URL;
 const AUSPOST_BEARER = process.env.AUSPOST_BEARER;
 if (!AUSPOST_BASE_URL) throw new Error('AUSPOST_BASE_URL is not set');
@@ -24,6 +25,7 @@ const typeDefs = gql`
   }
 `;
 
+// AusPost types
 type AusPostLocality = {
   latitude?: number | string;
   longitude?: number | string;
@@ -67,18 +69,21 @@ async function validateAgainstAusPost(postcode: string, suburb: string, state: s
   const sbL = UL(suburb);
   const st = U(state);
 
+  // Query by postcode + state
   const list = await fetchAusPost(pc, st);
-  const inState = list.filter(x => U(x.state ?? '') === st);
-  const exactPc = inState.filter(x => (x.postcode ?? '').trim() === pc);
+  const inState = list.filter((x) => U(x.state ?? '') === st);
+  const exactPc = inState.filter((x) => (x.postcode ?? '').trim() === pc);
 
   if (exactPc.length === 0) {
     return { success: false, message: `The postcode ${postcode} does not exist in the state ${state}.` };
   }
 
-  let hit = exactPc.find(x => U(x.location ?? '') === sb);
+  // Strict equality first
+  let hit = exactPc.find((x) => U(x.location ?? '') === sb);
 
+  // Fuzzy (stable)
   if (!hit) {
-    hit = exactPc.find(x => {
+    hit = exactPc.find((x) => {
       const loc = UL(x.location ?? '');
       return loc === sbL || loc.startsWith(sbL) || sbL.startsWith(loc) || loc.includes(sbL);
     });
@@ -96,9 +101,13 @@ async function validateAgainstAusPost(postcode: string, suburb: string, state: s
   };
 }
 
+// Resolvers
 const resolvers = {
   Query: {
-    validateAddress: async (_: unknown, args: { postcode: string; suburb: string; state: string }) => {
+    validateAddress: async (
+      _: unknown,
+      args: { postcode: string; suburb: string; state: string }
+    ) => {
       // Require login
       const session = await getSession();
       if (!session?.username) {
@@ -113,12 +122,15 @@ const resolvers = {
       if (!sb) return { success: false, message: 'Suburb is required.' };
       if (!/^(NSW|VIC|QLD|WA|SA|TAS|ACT|NT)$/i.test(st)) return { success: false, message: 'Invalid state.' };
 
+      // Ensure indices exist (cheap check)
+      await ensureIndices();
+
       try {
         const result = await validateAgainstAusPost(pc, sb, st);
 
-        // Always log with username (since now it's guaranteed to exist)
+        // Log success/failure to personalized index
         await es.index({
-          index: 'verifications',
+          index: VERIF_INDEX,
           document: {
             username: session.username,
             postcode: pc,
@@ -126,6 +138,7 @@ const resolvers = {
             state: U(st),
             success: result.success,
             message: result.message ?? null,
+            error: result.success ? null : result.message ?? 'Validation failed',
             lat: result.lat ?? null,
             lng: result.lng ?? null,
             createdAt: new Date().toISOString(),
@@ -134,12 +147,30 @@ const resolvers = {
 
         return result;
       } catch (e: any) {
+        // Also record upstream errors to logs
+        await es.index({
+          index: VERIF_INDEX,
+          document: {
+            username: session.username,
+            postcode: pc,
+            suburb: U(sb),
+            state: U(st),
+            success: false,
+            message: 'Validation failed due to an upstream error.',
+            error: e?.message ?? 'Unknown upstream error',
+            lat: null,
+            lng: null,
+            createdAt: new Date().toISOString(),
+          },
+        });
+
         return { success: false, message: e?.message ?? 'Validation failed due to an upstream error.' };
       }
     },
   },
 };
 
+// Bootstrap
 const server = new ApolloServer({ typeDefs, resolvers });
-const handler = startServerAndCreateNextHandler(server);
+const handler = startServerAndCreateNextHandler<NextRequest>(server);
 export { handler as GET, handler as POST };
