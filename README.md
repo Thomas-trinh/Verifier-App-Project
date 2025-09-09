@@ -1,36 +1,135 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Verifier App
 
-## Getting Started
+A Next.js single-page application with authentication, an address verifier form, and Elasticsearch logging.
 
-First, run the development server:
+## 🚀 Features Implemented
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+### Requirement 1 – Authentication
+- User registration and login (with password hashing via bcrypt).
+- Session management using JWT stored in HTTP-only cookies.
+- Credentials stored in Elasticsearch (`users` index).
+- Middleware-protected routes (users must log in before accessing `/verifier`).
+- Logout endpoint and UI integration.
+
+### Requirement 2 – Verification Form
+- Next.js App Router form for postcode, suburb, and state.
+- Client-side validation using **Zod**.
+- Server-side validation via GraphQL API proxy (`/api/graphql`).
+- Form result displayed as success/failure.
+
+### Requirement 3 – State Persistence
+- Form state persisted with **Zustand + localStorage**.
+- Data remains after closing/reopening the browser.
+- Verification attempts logged into Elasticsearch (`verifications` index) with:
+  - username
+  - postcode, suburb, state
+  - success/failure
+  - error message (if any)
+  - timestamp
+---
+
+## 🛠 Tech Stack
+
+- **Next.js 15 (App Router)**
+- **React 19**
+- **TypeScript**
+- **Apollo Server** (`@apollo/server` + `@as-integrations/next`) for GraphQL proxy
+- **Apollo Client v3** (with legacy peer deps override)
+- **Elasticsearch 8.x**
+- **Zustand** (state persistence)
+- **Zod** (form validation)
+- **Docker Compose** (dev environment)
+
+---
+
+## 📂 Project Structure
+
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+project-root/
+│── .env.local
+│── docker-compose.dev.yml
+│── Dockerfile.dev
+│── package.json
+│── tsconfig.json
+│
+├── src/
+│   ├── app/
+│   │   ├── layout.tsx
+│   │   ├── page.tsx
+│   │   ├── login/page.tsx
+│   │   ├── register/page.tsx
+│   │   ├── verifier/page.tsx
+│   │   └── api/
+│   │       ├── auth/
+│   │       │   ├── login/route.ts
+│   │       │   ├── register/route.ts
+│   │       │   ├── logout/route.ts
+│   │       │   └── me/route.ts
+│   │       ├── verify/route.ts
+│   │       └── graphql/route.ts
+│   │
+│   ├── components/
+│   │   ├── Navbar.tsx
+│   │   ├── NavbarWrapper.tsx
+│   │   ├── VerifierForm.tsx
+│   │   └── QueryProvider.tsx (if using React Query)
+│   │
+│   ├── lib/
+│   │   ├── elasticsearch.ts
+│   │   ├── auth.ts
+│   │   ├── session.ts
+│   │   ├── apollo-client.ts
+│   │   └── validation.ts
+│   │
+│   ├── store/
+│   │   ├── formStore.ts
+│   │   └── userStore.ts
+│   │
+│   └── styles/
+│       ├── globals.css
+│       └── auth.css
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+````
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## ⚡ Running the App
 
-To learn more about Next.js, take a look at the following resources:
+### 1. Environment Variables (`.env.local`)
+```ini
+ELASTICSEARCH_NODE=http://elasticsearch:9200
+ELASTICSEARCH_USERNAME=elastic
+ELASTICSEARCH_PASSWORD=changeme
+JWT_SECRET=your_secret
+SESSION_COOKIE_NAME=verifier_session
+````
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 2. Start Dev Environment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
 
-## Deploy on Vercel
+* Next.js dev server → [http://localhost:3000](http://localhost:3000)
+* Elasticsearch → [http://localhost:9200](http://localhost:9200)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 3. Verify Elasticsearch
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+List indices:
+
+```bash
+curl "http://localhost:9200/_cat/indices?v"
+```
+
+Check users:
+
+```bash
+curl "http://localhost:9200/users/_search?pretty"
+```
+
+Check verifications:
+
+```bash
+curl "http://localhost:9200/verifications/_search?pretty"
+```
