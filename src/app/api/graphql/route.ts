@@ -5,6 +5,13 @@ import type { NextRequest } from 'next/server';
 import { es, ensureIndices, VERIF_INDEX } from '@/lib/elasticsearch';
 import { getSession } from '@/lib/session';
 
+// ---- Debug switch -----------------------------------------------------------
+const DEBUG = process.env.DEBUG_VALIDATION === 'true' || process.env.NODE_ENV !== 'production';
+const dlog = (...args: any[]) => {
+  if (DEBUG) console.log('[GQL]', ...args);
+};
+// ----------------------------------------------------------------------------
+
 // Environment (fail fast)
 const AUSPOST_BASE_URL = process.env.AUSPOST_BASE_URL;
 const AUSPOST_BEARER = process.env.AUSPOST_BEARER;
@@ -43,10 +50,13 @@ const UL = (s: string) => U(s).replace(/[^A-Z0-9]+/g, ' ').replace(/\s+/g, ' ').
 const toNum = (n: any) => (n == null ? undefined : Number.isFinite(+n) ? +n : undefined);
 const toArr = (x: any) => (Array.isArray(x) ? x : x ? [x] : []);
 
+// Call AusPost
 async function fetchAusPost(q: string, state?: string) {
   const url = new URL(AUSPOST_BASE_URL!);
   url.searchParams.set('q', q);
   if (state) url.searchParams.set('state', state);
+
+  dlog('AusPost request =>', { q, state, url: url.toString() });
 
   const res = await fetch(url.toString(), {
     method: 'GET',
@@ -54,13 +64,24 @@ async function fetchAusPost(q: string, state?: string) {
     cache: 'no-store',
   });
 
+  const text = await res.text();
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`AusPost API error: ${res.status} ${res.statusText} ${text}`);
+    dlog('AusPost error status:', res.status, res.statusText, 'body:', text.slice(0, 500));
+    throw new Error(`AusPost API error: ${res.status} ${res.statusText}`);
   }
 
-  const json = (await res.json()) as AusPostResponse;
-  return toArr(json?.localities?.locality);
+  // Try to parse JSON; log a sample of the payload
+  let json: AusPostResponse;
+  try {
+    json = JSON.parse(text) as AusPostResponse;
+  } catch (e) {
+    dlog('AusPost JSON parse failed, raw body:', text.slice(0, 500));
+    throw new Error('AusPost API returned non-JSON');
+  }
+
+  const list = toArr(json?.localities?.locality);
+  dlog('AusPost total results:', list.length, 'sample:', list[0]);
+  return list;
 }
 
 async function validateAgainstAusPost(postcode: string, suburb: string, state: string) {
@@ -74,8 +95,17 @@ async function validateAgainstAusPost(postcode: string, suburb: string, state: s
   const inState = list.filter((x) => U(x.state ?? '') === st);
   const exactPc = inState.filter((x) => (x.postcode ?? '').trim() === pc);
 
+  dlog('Filter counts =>', {
+    total: list.length,
+    inState: inState.length,
+    exactPc: exactPc.length,
+    target: { pc, sb, st },
+  });
+
   if (exactPc.length === 0) {
-    return { success: false, message: `The postcode ${postcode} does not exist in the state ${state}.` };
+    const msg = `The postcode ${postcode} does not exist in the state ${state}.`;
+    dlog('Result:', msg);
+    return { success: false, message: msg };
   }
 
   // Strict equality first
@@ -90,15 +120,17 @@ async function validateAgainstAusPost(postcode: string, suburb: string, state: s
   }
 
   if (!hit) {
-    return { success: false, message: `The postcode ${postcode} does not match the suburb ${suburb}.` };
+    const msg = `The postcode ${postcode} does not match the suburb ${suburb}.`;
+    dlog('Result:', msg, 'candidates sample:', exactPc[0]);
+    return { success: false, message: msg };
   }
 
-  return {
-    success: true,
-    message: 'The postcode, suburb, and state input are valid.',
-    lat: toNum(hit.latitude),
-    lng: toNum(hit.longitude),
-  };
+  const lat = toNum(hit.latitude);
+  const lng = toNum(hit.longitude);
+  const okMsg = 'The postcode, suburb, and state input are valid.';
+  dlog('Result: OK', { lat, lng, suburbHit: hit.location });
+
+  return { success: true, message: okMsg, lat, lng };
 }
 
 // Resolvers
@@ -108,9 +140,9 @@ const resolvers = {
       _: unknown,
       args: { postcode: string; suburb: string; state: string }
     ) => {
-      // Require login
       const session = await getSession();
       if (!session?.username) {
+        dlog('Unauthorized request (no session).');
         return { success: false, message: 'Unauthorized: please log in first.' };
       }
 
@@ -118,18 +150,19 @@ const resolvers = {
       const sb = args.suburb?.trim() ?? '';
       const st = args.state?.trim() ?? '';
 
+      dlog('Incoming validateAddress', { user: session.username, pc, sb, st });
+
       if (!/^\d{4}$/.test(pc)) return { success: false, message: 'Postcode must be 4 digits.' };
       if (!sb) return { success: false, message: 'Suburb is required.' };
       if (!/^(NSW|VIC|QLD|WA|SA|TAS|ACT|NT)$/i.test(st)) return { success: false, message: 'Invalid state.' };
 
-      // Ensure indices exist (cheap check)
       await ensureIndices();
 
       try {
         const result = await validateAgainstAusPost(pc, sb, st);
 
-        // Log success/failure to personalized index
-        await es.index({
+        // Log to ES (fire-and-forget with error log)
+        es.index({
           index: VERIF_INDEX,
           document: {
             username: session.username,
@@ -143,12 +176,14 @@ const resolvers = {
             lng: result.lng ?? null,
             createdAt: new Date().toISOString(),
           },
-        });
+        }).catch((e) => dlog('ES index error:', e?.message));
 
+        dlog('Final result:', result);
         return result;
       } catch (e: any) {
-        // Also record upstream errors to logs
-        await es.index({
+        dlog('validateAddress exception:', e?.message);
+
+        es.index({
           index: VERIF_INDEX,
           document: {
             username: session.username,
@@ -162,7 +197,7 @@ const resolvers = {
             lng: null,
             createdAt: new Date().toISOString(),
           },
-        });
+        }).catch((err) => dlog('ES index error (exception path):', err?.message));
 
         return { success: false, message: e?.message ?? 'Validation failed due to an upstream error.' };
       }
@@ -174,3 +209,6 @@ const resolvers = {
 const server = new ApolloServer({ typeDefs, resolvers });
 const handler = startServerAndCreateNextHandler<NextRequest>(server);
 export { handler as GET, handler as POST };
+
+// Helpers for unit tests
+export const __testables = { validateAgainstAusPost: validateAgainstAusPost };

@@ -23,11 +23,11 @@ export default function GoogleMap({ lat, lng, height = 320, zoom = 14 }: Props) 
   }
 
   if (!isLoaded) {
-    return <div className="text-sm text-gray-500">Loading map…</div>;
+    return <div className="text-sm text-slate-500">Loading map…</div>;
   }
 
   return (
-    <div style={{ width: '100%', height }}>
+    <div style={{ width: '100%', height }} className="rounded-xl overflow-hidden">
       <GMap
         mapContainerStyle={{ width: '100%', height: '100%' }}
         center={center}
