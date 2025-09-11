@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { es, ensureIndices } from '@/lib/elasticsearch';
-import { getSession } from '@/lib/session';
 import { z } from 'zod';
+import { ensureIndices, logVerification } from '@/lib/elasticsearch';
+import { getSession } from '@/lib/session';
 
 const VerifySchema = z.object({
   postcode: z.string().min(1),
@@ -9,6 +9,8 @@ const VerifySchema = z.object({
   state: z.string().min(1),
   success: z.boolean(),
   error: z.string().optional(),
+  lat: z.number().nullable().optional(),
+  lng: z.number().nullable().optional(),
 });
 
 export async function POST(req: Request) {
@@ -21,20 +23,21 @@ export async function POST(req: Request) {
     }
 
     const json = await req.json();
-    const { postcode, suburb, state, success, error } = VerifySchema.parse(json);
+    const { postcode, suburb, state, success, error, lat, lng } =
+      VerifySchema.parse(json);
 
-    const res = await es.index({
-      index: 'verifications',
-      document: {
-        username: session.username,
-        postcode,
-        suburb,
-        state,
-        success,
-        error: error ?? null,
-        createdAt: new Date().toISOString(),
-      },
-      refresh: 'wait_for',
+    const res = await logVerification({
+      username: session.username,
+      postcode,
+      suburb,
+      state,
+      success,
+      error: error ?? null,
+      lat: lat ?? null,
+      lng: lng ?? null,
+      message: success
+        ? 'The postcode, suburb, and state input are valid.'
+        : error ?? 'Validation failed',
     });
 
     return NextResponse.json(
@@ -42,9 +45,8 @@ export async function POST(req: Request) {
       { status: 201 }
     );
   } catch (e: any) {
-    // zod error or ES error
     const message =
-      e?.issues?.[0]?.message /* zod */ ||
+      e?.issues?.[0]?.message /* Zod */ ||
       e?.meta?.body?.error?.reason /* ES */ ||
       e?.message ||
       'Internal error';
