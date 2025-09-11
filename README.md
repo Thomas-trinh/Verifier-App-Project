@@ -299,3 +299,19 @@ npm run lint
 * `GET  /api/auth/me` – returns current username (if logged in)
 * `POST /api/graphql` – `validateAddress` resolver; logs attempts into `verifications`
 * `GET  /api/logs` – (optional) fetch verification logs for the logged-in user
+
+---
+
+## ⚠️ Upstream API Reliability (Important)
+
+This app depends on an external upstream (e.g., the Australia Post endpoint) for validation and geocoding. In non-production or high-load periods, the upstream can be **intermittently unstable**, which may result in:
+
+* Occasional timeouts or 5xx responses.
+* Inconsistent search results for valid postcode/suburb/state combinations (sometimes returning empty results, then succeeding later with the same inputs).
+* Sporadic missing `lat/lng` coordinates even when a suburb/postcode pair is valid.
+* Short-burst rate limiting (429) without reliable `Retry-After` guidance.
+
+**What you might see in the app:**  
+Sometimes a request that previously returned “valid” may subsequently return “invalid” (and vice versa) for identical inputs, even though the client and server code are unchanged. This is expected behavior when the upstream is experiencing issues.
+
+> **Tip:** If you’ve verified the input characters are correct (postcode is exactly 4 digits, suburb/state spelling & casing are correct, no trailing spaces), simply **retry the same request several times in quick succession**. The upstream is intermittently flaky and identical inputs may alternate between success and failure; a few rapid retries often succeed.

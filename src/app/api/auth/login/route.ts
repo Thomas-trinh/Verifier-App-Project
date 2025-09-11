@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ensureIndices, findUser } from '@/lib/elasticsearch';
-import { comparePassword } from '@/lib/auth';
+import { ensureIndices, findUser } from '@/lib/ElasticSearch';
+import { comparePassword } from '@/lib/Auth';
 import jwt from 'jsonwebtoken';
-import { getClientIp, rateLimitLogin } from '@/lib/rateLimit';
+import { getClientIp, rateLimitLogin } from '@/lib/RateLimit';
 
 const schema = z.object({
   username: z.string().min(1, 'Username is required'),

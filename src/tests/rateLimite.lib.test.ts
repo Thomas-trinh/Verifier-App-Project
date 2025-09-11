@@ -14,7 +14,7 @@ describe('lib/rateLimit', () => {
 
   describe('getClientIp', () => {
     it('returns first IP from x-forwarded-for (if present)', async () => {
-      const mod = await import('../lib/rateLimit');
+      const mod = await import('../lib/RateLimit');
       const req = new Request('http://localhost/', {
         headers: {
           'x-forwarded-for': '203.0.113.5, 70.41.3.18, 150.172.238.178',
@@ -25,7 +25,7 @@ describe('lib/rateLimit', () => {
     });
 
     it('falls back to x-real-ip if no x-forwarded-for', async () => {
-      const mod = await import('../lib/rateLimit');
+      const mod = await import('../lib/RateLimit');
       const req = new Request('http://localhost/', {
         headers: { 'x-real-ip': '198.51.100.17' },
       });
@@ -33,7 +33,7 @@ describe('lib/rateLimit', () => {
     });
 
     it('returns 127.0.0.1 if neither header exists', async () => {
-      const mod = await import('../lib/rateLimit');
+      const mod = await import('../lib/RateLimit');
       const req = new Request('http://localhost/');
       expect(mod.getClientIp(req)).toBe('127.0.0.1');
     });
@@ -43,7 +43,7 @@ describe('lib/rateLimit', () => {
     it('allows first 10 attempts within the 5-minute window, then blocks', async () => {
       // reset module to clear internal buckets map
       vi.resetModules();
-      const mod = await import('../lib/rateLimit');
+      const mod = await import('../lib/RateLimit');
 
       const ip = '192.0.2.10';
 
@@ -62,7 +62,7 @@ describe('lib/rateLimit', () => {
 
     it('resets after 5 minutes so the next attempt is allowed again', async () => {
       vi.resetModules();
-      const mod = await import('../lib/rateLimit');
+      const mod = await import('../lib/RateLimit');
 
       const ip = '192.0.2.11';
 

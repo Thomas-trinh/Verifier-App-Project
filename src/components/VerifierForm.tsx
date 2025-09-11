@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useFormStore } from '@/store/formStore';
-import { makeApolloClient } from '@/lib/apollo-client';
+import { makeApolloClient } from '@/lib/apolloClient';
 import { ApolloProvider, useApolloClient } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { z } from 'zod';

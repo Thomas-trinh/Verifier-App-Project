@@ -32,13 +32,47 @@ export type ValidationResult = {
   lng?: number;
 };
 
-// Small utils
-const U  = (s: string) => s.trim().toUpperCase();
-const UL = (s: string) => U(s).replace(/[^A-Z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
-const toNum = (n: any) =>
-  n == null ? undefined : Number.isFinite(+n) ? +n : undefined;
-const toArr = <T>(x: T | T[] | undefined | null): T[] =>
-  Array.isArray(x) ? x : x ? [x] : [];
+/** Uppercase + trim (for strict comparisons). */
+function toUpperTrim(s: string): string {
+  return s.trim().toUpperCase();
+}
+
+/**
+ * Normalize a string for fuzzy comparisons:
+ * - Convert to uppercase
+ * - Replace all non-alphanumeric characters with spaces
+ * - Collapse multiple spaces into one
+ * - Trim spaces at the start/end
+ */
+function normalizeForFuzzyMatch(s: string): string {
+  const upper = toUpperTrim(s);
+  const withSpaces = upper.replace(/[^A-Z0-9]+/g, ' ');
+  const collapsed = withSpaces.replace(/\s+/g, ' ').trim();
+  return collapsed;
+}
+
+/**
+ * Convert a value to a number if possible.
+ * Returns `undefined` for null/undefined/NaN/Infinity.
+ */
+function toNumberOrUndefined(n: unknown): number | undefined {
+  if (n == null) return undefined;
+  const num = Number(n);
+  return Number.isFinite(num) ? num : undefined;
+}
+
+/**
+ * Ensure a value is always returned as an array.
+ * - If already an array → return as-is
+ * - If null/undefined → return []
+ * - Otherwise → wrap in an array
+ */
+function toArray<T>(x: T | T[] | null | undefined): T[] {
+  if (Array.isArray(x)) return x;
+  if (x == null) return [];
+  return [x];
+}
+
 
 /**
  * Low-level call to AusPost suggest endpoint.
@@ -74,7 +108,7 @@ export async function fetchLocalities(q: string, state?: string): Promise<AusPos
     throw new Error('AusPost API returned non-JSON');
   }
 
-  const list = toArr(json?.localities?.locality);
+  const list = toArray(json?.localities?.locality);
   dlog('Total results:', list.length, 'sample:', list[0]);
   return list;
 }
@@ -88,14 +122,14 @@ export async function validateAgainstAusPost(
   suburb: string,
   state: string
 ): Promise<ValidationResult> {
-  const pc  = U(postcode);
-  const sb  = U(suburb);
-  const sbL = UL(suburb);
-  const st  = U(state);
+  const pc  = toUpperTrim(postcode);
+  const sb  = toUpperTrim(suburb);
+  const sbL = normalizeForFuzzyMatch(suburb);
+  const st  = toUpperTrim(state);
 
   // Query by postcode + state
   const list    = await fetchLocalities(pc, st);
-  const inState = list.filter((x) => U(x.state ?? '') === st);
+  const inState = list.filter((x) => toUpperTrim(x.state ?? '') === st);
   const exactPc = inState.filter((x) => (x.postcode ?? '').trim() === pc);
 
   dlog('Filter counts =>', {
@@ -112,12 +146,12 @@ export async function validateAgainstAusPost(
   }
 
   // Strict equality first
-  let hit = exactPc.find((x) => U(x.location ?? '') === sb);
+  let hit = exactPc.find((x) => toUpperTrim(x.location ?? '') === sb);
 
   // Fuzzy matching
   if (!hit) {
     hit = exactPc.find((x) => {
-      const loc = UL(x.location ?? '');
+      const loc = normalizeForFuzzyMatch(x.location ?? '');
       return loc === sbL || loc.startsWith(sbL) || sbL.startsWith(loc) || loc.includes(sbL);
     });
   }
@@ -128,8 +162,8 @@ export async function validateAgainstAusPost(
     return { success: false, message: msg };
   }
 
-  const lat = toNum(hit.latitude);
-  const lng = toNum(hit.longitude);
+  const lat = toNumberOrUndefined(hit.latitude);
+  const lng = toNumberOrUndefined(hit.longitude);
   const okMsg = 'The postcode, suburb, and state input are valid.';
   dlog('Result: OK', { lat, lng, suburbHit: hit.location });
 

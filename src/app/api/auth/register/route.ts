@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ensureIndices, findUser, es, USERS_INDEX } from '@/lib/elasticsearch';
-import { hashPassword } from '@/lib/auth';
+import { ensureIndices, findUser, es, USERS_INDEX } from '@/lib/ElasticSearch';
+import { hashPassword } from '@/lib/Auth';
 
 const schema = z.object({
   username: z.string().trim()

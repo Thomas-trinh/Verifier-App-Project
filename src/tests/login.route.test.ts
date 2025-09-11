@@ -17,7 +17,6 @@ const {
   rateLimitLoginMock: vi.fn().mockReturnValue({ allowed: true, retryAfterSec: 0 }),
 }));
 
-// Mock alias modules
 vi.mock('@/lib/elasticsearch', () => ({
   __esModule: true,
   ensureIndices: ensureIndicesMock,
@@ -27,18 +26,27 @@ vi.mock('@/lib/auth', () => ({
   __esModule: true,
   comparePassword: comparePasswordMock,
 }));
-vi.mock('jsonwebtoken', () => ({
-  __esModule: true,
-  default: { sign: jwtSignMock },
-  sign: jwtSignMock,
-}));
 vi.mock('@/lib/rateLimit', () => ({
   __esModule: true,
   getClientIp: getClientIpMock,
   rateLimitLogin: rateLimitLoginMock,
 }));
 
-// (tuỳ chọn) mock thêm biến thể relative nếu test khác dùng ../
+vi.mock('@/lib/ElasticSearch', () => ({
+  __esModule: true,
+  ensureIndices: ensureIndicesMock,
+  findUser: findUserMock,
+}));
+vi.mock('@/lib/Auth', () => ({
+  __esModule: true,
+  comparePassword: comparePasswordMock,
+}));
+vi.mock('@/lib/RateLimit', () => ({
+  __esModule: true,
+  getClientIp: getClientIpMock,
+  rateLimitLogin: rateLimitLoginMock,
+}));
+
 vi.mock('../lib/elasticsearch', () => ({
   __esModule: true,
   ensureIndices: ensureIndicesMock,
@@ -52,6 +60,12 @@ vi.mock('../lib/rateLimit', () => ({
   __esModule: true,
   getClientIp: getClientIpMock,
   rateLimitLogin: rateLimitLoginMock,
+}));
+
+vi.mock('jsonwebtoken', () => ({
+  __esModule: true,
+  default: { sign: jwtSignMock },
+  sign: jwtSignMock,
 }));
 
 function makeReq(body?: any) {
@@ -72,7 +86,7 @@ describe('POST /api/auth/login', () => {
     getClientIpMock.mockReset().mockReturnValue('1.2.3.4');
     rateLimitLoginMock.mockReset().mockReturnValue({ allowed: true, retryAfterSec: 0 });
 
-    // ENV cho JWT/cookie
+    // ENV for JWT/cookie
     (process.env as any).JWT_SECRET = 'test-secret';
     (process.env as any).SESSION_COOKIE_NAME = 'session';
     (process.env as any).NODE_ENV = 'test';
@@ -88,7 +102,9 @@ describe('POST /api/auth/login', () => {
     expect(res.status).toBe(429);
     expect(res.headers.get('Retry-After')).toBe('45');
     const json: any = await res.json();
-    expect(json.error).toBe('Too many login attempts. Please wait a moment before trying again.');
+    expect(json.ok).toBe(false);
+    expect(Array.isArray(json.formErrors)).toBe(true);
+    expect(json.formErrors[0]).toBe('Too many login attempts. Please wait a moment and try again.');
     expect(jwtSignMock).not.toHaveBeenCalled();
   });
 
@@ -100,19 +116,28 @@ describe('POST /api/auth/login', () => {
 
     expect(res.status).toBe(400);
     const json: any = await res.json();
-    expect(json.error).toBe('Invalid request. Please check your input and try again.');
+    expect(json.ok).toBe(false);
+    expect(Array.isArray(json.formErrors)).toBe(true);
+    expect(json.formErrors[0]).toBe('Invalid request. Please check your input and try again.');
   });
 
   it('400 missing fields (schema fail)', async () => {
-    ensureIndicesMock.mockResolvedValue(undefined);
+  ensureIndicesMock.mockResolvedValue(undefined);
 
-    const { POST } = await import('../app/api/auth/login/route');
-    const res = await POST(makeReq({})); // thiếu username/password
+  const { POST } = await import('../app/api/auth/login/route');
 
-    expect(res.status).toBe(400);
-    const json: any = await res.json();
-    expect(json.error).toBe('Please provide both username and password.');
-  });
+  const res = await POST(makeReq({ username: '', password: '' }));
+
+  expect(res.status).toBe(400);
+  const json: any = await res.json();
+  expect(json.ok).toBe(false);
+
+  expect(Array.isArray(json.fieldErrors.username)).toBe(true);
+  expect(Array.isArray(json.fieldErrors.password)).toBe(true);
+
+  expect(json.fieldErrors.username[0]).toBe('Username is required');
+  expect(json.fieldErrors.password[0]).toBe('Password is required');
+});
 
   it('401 user not found', async () => {
     ensureIndicesMock.mockResolvedValue(undefined);
@@ -123,7 +148,9 @@ describe('POST /api/auth/login', () => {
 
     expect(res.status).toBe(401);
     const json: any = await res.json();
-    expect(json.error).toBe('The username or password you entered is incorrect.');
+    expect(json.ok).toBe(false);
+    expect(json.fieldErrors).toBeTruthy();
+    expect(json.fieldErrors.username[0]).toBe('No account found with that username.');
   });
 
   it('401 wrong password', async () => {
@@ -136,7 +163,9 @@ describe('POST /api/auth/login', () => {
 
     expect(res.status).toBe(401);
     const json: any = await res.json();
-    expect(json.error).toBe('The username or password you entered is incorrect.');
+    expect(json.ok).toBe(false);
+    expect(json.fieldErrors).toBeTruthy();
+    expect(json.fieldErrors.password[0]).toBe('Incorrect password.');
   });
 
   it('200 success (sets cookie)', async () => {

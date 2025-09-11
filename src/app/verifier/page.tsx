@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/session';
+import { getSession } from '@/lib/Session';
 import VerifierForm from '@/components/VerifierForm';
 
 export const dynamic = 'force-dynamic';
