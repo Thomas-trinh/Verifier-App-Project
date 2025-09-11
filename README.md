@@ -151,7 +151,7 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_maps_key
 ```bash
 # Clone
 git clone https://github.com/Thomas-trinh/Verifier-App-Project.git
-cd <your-repo>
+cd Verifier-App-Project
 
 # Install dependencies (choose one)
 pnpm install
