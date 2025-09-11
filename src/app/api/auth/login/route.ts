@@ -5,7 +5,10 @@ import { comparePassword } from '@/lib/auth';
 import jwt from 'jsonwebtoken';
 import { getClientIp, rateLimitLogin } from '@/lib/rateLimit';
 
-const schema = z.object({ username: z.string(), password: z.string() });
+const schema = z.object({
+  username: z.string().min(1, 'Username is required'),
+  password: z.string().min(1, 'Password is required'),
+});
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,19 +16,15 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: Request) {
   await ensureIndices();
 
-  // Rate limit by IP
   const ip = getClientIp(req);
   const { allowed, retryAfterSec } = rateLimitLogin(ip);
   if (!allowed) {
     return NextResponse.json(
       {
-        error:
-          'Too many login attempts. Please wait a moment before trying again.',
+        ok: false,
+        formErrors: ['Too many login attempts. Please wait a moment and try again.'],
       },
-      {
-        status: 429,
-        headers: { 'Retry-After': String(retryAfterSec || 60) },
-      }
+      { status: 429, headers: { 'Retry-After': String(retryAfterSec || 60) } }
     );
   }
 
@@ -34,25 +33,29 @@ export async function POST(req: Request) {
     body = await req.json();
   } catch {
     return NextResponse.json(
-      { error: 'Invalid request. Please check your input and try again.' },
+      { ok: false, formErrors: ['Invalid request. Please check your input and try again.'] },
       { status: 400 }
     );
   }
 
-  const parseResult = schema.safeParse(body);
-  if (!parseResult.success) {
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    const { fieldErrors, formErrors } = parsed.error.flatten();
     return NextResponse.json(
-      { error: 'Please provide both username and password.' },
+      { ok: false, fieldErrors, formErrors },
       { status: 400 }
     );
   }
 
-  const { username, password } = parseResult.data;
+  const { username, password } = parsed.data;
   const user = await findUser(username);
 
   if (!user) {
     return NextResponse.json(
-      { error: 'The username or password you entered is incorrect.' },
+      {
+        ok: false,
+        fieldErrors: { username: ['No account found with that username.'] },
+      },
       { status: 401 }
     );
   }
@@ -60,7 +63,7 @@ export async function POST(req: Request) {
   const ok = await comparePassword(password, user.passwordHash);
   if (!ok) {
     return NextResponse.json(
-      { error: 'The username or password you entered is incorrect.' },
+      { ok: false, fieldErrors: { password: ['Incorrect password.'] } },
       { status: 401 }
     );
   }
@@ -78,7 +81,7 @@ export async function POST(req: Request) {
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    maxAge: 60 * 60 * 24 * 7, // 7 days
+    maxAge: 60 * 60 * 24 * 7,
   });
 
   return response;

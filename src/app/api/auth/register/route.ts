@@ -4,14 +4,17 @@ import { ensureIndices, findUser, es, USERS_INDEX } from '@/lib/elasticsearch';
 import { hashPassword } from '@/lib/auth';
 
 const schema = z.object({
-  username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9._-]+$/),
+  username: z.string().trim()
+    .min(3, 'Username must be at least 3 characters')
+    .max(50, 'Username must be at most 50 characters')
+    .regex(/^[a-zA-Z0-9._-]+$/, 'Username can only contain letters, numbers, dot (.), underscore (_), or dash (-)'),
   password: z.string()
-    .min(8)
-    .regex(/[A-Z]/)
-    .regex(/[a-z]/)
-    .regex(/[0-9]/)
-    .regex(/[^A-Za-z0-9]/),
-});
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Password must include at least one uppercase letter (A–Z)')
+    .regex(/[a-z]/, 'Password must include at least one lowercase letter (a–z)')
+    .regex(/[0-9]/, 'Password must include at least one number (0–9)')
+    .regex(/[^A-Za-z0-9]/, 'Password must include at least one symbol (e.g. !@#$%)'),
+}).strict();
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,20 +39,21 @@ export async function POST(req: Request) {
     );
   }
 
-  const parseResult = schema.safeParse(body);
-  if (!parseResult.success) {
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    const { fieldErrors, formErrors } = parsed.error.flatten();
     return NextResponse.json(
-      { error: 'Please check your username and password format.' },
+      { fieldErrors, formErrors },
       { status: 400 }
     );
   }
 
-  const { username, password } = parseResult.data;
+  const { username, password } = parsed.data;
 
   const existing = await findUser(username);
   if (existing) {
     return NextResponse.json(
-      { error: 'This username is already taken. Please choose another one.' },
+      { fieldErrors: { username: ['This username is already taken. Please choose another one.'] } },
       { status: 400 }
     );
   }

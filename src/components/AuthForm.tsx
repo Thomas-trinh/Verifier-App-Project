@@ -2,37 +2,80 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+type ApiResponse =
+  | {
+      ok?: boolean;
+      error?: string;
+      fieldErrors?: Record<string, string[]>;
+      formErrors?: string[];
+      username?: string;
+    }
+  | any;
+
 export default function AuthForm({ mode }: { mode: 'login' | 'register' }) {
+  const router = useRouter();
+
+  // Form state
   const [username, setU] = useState('');
   const [password, setP] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+
+  // Error state (field-level + form-level)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+  const [formErrors, setFormErrors] = useState<string[]>([]);
+
+  // Convenience flags
+  const hasUErr = (fieldErrors.username?.length ?? 0) > 0;
+  const hasPErr = (fieldErrors.password?.length ?? 0) > 0;
+  const disabled = loading || !username || !password;
+
+  // Safely parse JSON even when body may be empty or non-JSON
+  async function parseJSONSafe(res: Response): Promise<ApiResponse | null> {
+    try {
+      const text = await res.text();
+      return text ? JSON.parse(text) : null;
+    } catch {
+      return null;
+    }
+  }
 
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
-    setError(null);
     setLoading(true);
+    setFormErrors([]);
+    setFieldErrors({});
+
     try {
       const res = await fetch(`/api/auth/${mode}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Failed');
+
+      const data = await parseJSONSafe(res);
+
+      if (!res.ok || data?.ok === false) {
+        // Prefer detailed errors from backend
+        if (data?.fieldErrors) setFieldErrors(data.fieldErrors);
+
+        const msgs: string[] = [];
+        if (Array.isArray(data?.formErrors) && data.formErrors.length) {
+          msgs.push(...data.formErrors);
+        }
+        if (data?.error) msgs.push(String(data.error));
+
+        setFormErrors(msgs.length ? msgs : [`Request failed (${res.status})`]);
         return;
       }
+
+      // Success navigation
       router.push(mode === 'login' ? '/verifier' : '/login');
     } catch (err: any) {
-      setError(err?.message ?? 'Unexpected error');
+      setFormErrors([err?.message ?? 'Unexpected error']);
     } finally {
       setLoading(false);
     }
   }
-
-  const disabled = loading || !username || !password;
 
   return (
     <form onSubmit={submit} className="w-full max-w-md">
@@ -40,39 +83,74 @@ export default function AuthForm({ mode }: { mode: 'login' | 'register' }) {
         <h2 className="text-lg font-semibold mb-5">
           {mode === 'login' ? 'Welcome back' : 'Create an account'}
         </h2>
+
         <div className="space-y-4">
+          {/* Username */}
           <label className="block text-sm">
             <span className="mb-1 block text-slate-600">Username</span>
             <input
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none ring-0 focus:border-slate-400"
+              className={[
+                'w-full rounded-lg border bg-white px-3 py-2 outline-none ring-0 focus:border-slate-400',
+                hasUErr ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200' : 'border-slate-300',
+              ].join(' ')}
               placeholder="Your username"
               value={username}
-              onChange={(e) => setU(e.target.value)}
+              onChange={(e) => {
+                setU(e.target.value);
+                if (hasUErr) setFieldErrors((prev) => ({ ...prev, username: [] }));
+              }}
               autoComplete="username"
+              aria-invalid={hasUErr}
+              aria-describedby={hasUErr ? 'username-error' : undefined}
             />
+            {hasUErr && (
+              <ul id="username-error" className="mt-1 space-y-1">
+                {fieldErrors.username!.map((m, i) => (
+                  <li key={i} className="text-xs text-red-600">
+                    {m}
+                  </li>
+                ))}
+              </ul>
+            )}
           </label>
+
+          {/* Password */}
           <label className="block text-sm">
             <span className="mb-1 block text-slate-600">Password</span>
             <input
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none ring-0 focus:border-slate-400"
+              className={[
+                'w-full rounded-lg border bg-white px-3 py-2 outline-none ring-0 focus:border-slate-400',
+                hasPErr ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200' : 'border-slate-300',
+              ].join(' ')}
               placeholder="••••••••"
               type="password"
               value={password}
-              onChange={(e) => setP(e.target.value)}
+              onChange={(e) => {
+                setP(e.target.value);
+                if (hasPErr) setFieldErrors((prev) => ({ ...prev, password: [] }));
+              }}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              aria-invalid={hasPErr}
+              aria-describedby={hasPErr ? 'password-error' : undefined}
             />
+            {hasPErr && (
+              <ul id="password-error" className="mt-1 space-y-1">
+                {fieldErrors.password!.map((m, i) => (
+                  <li key={i} className="text-xs text-red-600">
+                    {m}
+                  </li>
+                ))}
+              </ul>
+            )}
           </label>
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-              {error}
-            </p>
-          )}
+
           <button
             type="submit"
             disabled={disabled}
             className={`w-full rounded-lg px-4 py-2.5 text-white transition-colors ${
               disabled ? 'bg-slate-300' : 'bg-slate-900 hover:bg-black'
             }`}
+            aria-busy={loading}
           >
             {loading ? 'Processing…' : mode === 'login' ? 'Login' : 'Register'}
           </button>
