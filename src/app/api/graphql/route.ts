@@ -9,7 +9,7 @@ import { validateAgainstAusPost } from '@/lib/auspost';
 // ---- Debug switch -----------------------------------------------------------
 const DEBUG =
   process.env.DEBUG_VALIDATION === 'true' || process.env.NODE_ENV !== 'production';
-const dlog = (...args: any[]) => {
+const dlog = (...args: Parameters<typeof console.log>) => {
   if (DEBUG) console.log('[GQL]', ...args);
 };
 // ----------------------------------------------------------------------------
@@ -57,7 +57,8 @@ const resolvers = {
       try {
         const result = await validateAgainstAusPost(pc, sb, st);
 
-        // Log to ES via helper (fire-and-forget with error log)
+        // Fire-and-forget logging
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         logVerification({
           username: session.username,
           postcode: pc,
@@ -68,13 +69,15 @@ const resolvers = {
           error: result.success ? null : result.message ?? 'Validation failed',
           lat: result.lat ?? null,
           lng: result.lng ?? null,
-        }).catch((e) => dlog('ES logVerification error:', e?.message));
+        }).catch((e) => dlog('ES logVerification error:', (e as Error)?.message));
 
         dlog('Final result:', result);
         return result;
-      } catch (e: any) {
-        dlog('validateAddress exception:', e?.message);
+      } catch (e) {
+        const msg = (e as Error)?.message ?? 'Validation failed due to an upstream error';
+        dlog('validateAddress exception:', msg);
 
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         logVerification({
           username: session.username,
           postcode: pc,
@@ -82,21 +85,31 @@ const resolvers = {
           state: st.toUpperCase(),
           success: false,
           message: 'Validation failed due to an upstream error.',
-          error: e?.message ?? 'Unknown upstream error',
+          error: msg,
           lat: null,
           lng: null,
-        }).catch((err) => dlog('ES logVerification error (exception path):', err?.message));
+        }).catch((err) => dlog('ES logVerification error (exception path):', (err as Error)?.message));
 
-        return {
-          success: false,
-          message: e?.message ?? 'Validation failed due to an upstream error.',
-        };
+        return { success: false, message: msg };
       }
     },
   },
 };
 
-// Bootstrap
+// Bootstrap Apollo
 const server = new ApolloServer({ typeDefs, resolvers });
-const handler = startServerAndCreateNextHandler<NextRequest>(server);
-export { handler as GET, handler as POST };
+
+const apolloHandler = startServerAndCreateNextHandler<NextRequest>(server, {
+  context: async (req) => ({ req }),
+});
+
+// App Router expects: (req: NextRequest, ctx: { params: Promise<{}> })
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: NextRequest, _ctx: { params: Promise<{}> }) {
+  return apolloHandler(req);
+}
+export async function POST(req: NextRequest, _ctx: { params: Promise<{}> }) {
+  return apolloHandler(req);
+}

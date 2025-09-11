@@ -7,6 +7,9 @@ import { getClientIp, rateLimitLogin } from '@/lib/rateLimit';
 
 const schema = z.object({ username: z.string(), password: z.string() });
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: Request) {
   await ensureIndices();
 

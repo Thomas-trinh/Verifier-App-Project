@@ -13,6 +13,9 @@ const VerifySchema = z.object({
   lng: z.number().nullable().optional(),
 });
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: Request) {
   try {
     await ensureIndices();

@@ -13,6 +13,9 @@ const schema = z.object({
     .regex(/[^A-Za-z0-9]/),
 });
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: Request) {
   try {
     await ensureIndices();

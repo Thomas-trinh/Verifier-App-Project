@@ -1,12 +1,15 @@
+// src/tests/logs.route.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { fetchLogsMock, getSessionMock } = vi.hoisted(() => ({
+const { ensureIndicesMock, fetchLogsMock, getSessionMock } = vi.hoisted(() => ({
+  ensureIndicesMock: vi.fn(),
   fetchLogsMock: vi.fn(),
   getSessionMock: vi.fn(),
 }));
 
 vi.mock('@/lib/elasticsearch', () => ({
   __esModule: true,
+  ensureIndices: ensureIndicesMock,
   fetchLogs: fetchLogsMock,
 }));
 vi.mock('@/lib/session', () => ({
@@ -16,6 +19,7 @@ vi.mock('@/lib/session', () => ({
 
 vi.mock('../lib/elasticsearch', () => ({
   __esModule: true,
+  ensureIndices: ensureIndicesMock,
   fetchLogs: fetchLogsMock,
 }));
 vi.mock('../lib/session', () => ({
@@ -26,6 +30,7 @@ vi.mock('../lib/session', () => ({
 describe('GET /api/logs', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    ensureIndicesMock.mockReset().mockResolvedValue(undefined);
     fetchLogsMock.mockReset();
     getSessionMock.mockReset();
   });
@@ -39,6 +44,7 @@ describe('GET /api/logs', () => {
     expect(res.status).toBe(200);
     const json: any = await res.json();
     expect(json.items).toEqual([]);
+    expect(ensureIndicesMock).toHaveBeenCalled();
     expect(fetchLogsMock).not.toHaveBeenCalled();
   });
 
@@ -52,6 +58,7 @@ describe('GET /api/logs', () => {
     expect(res.status).toBe(200);
     const json: any = await res.json();
     expect(json.items).toEqual([{ id: '1' }, { id: '2' }]);
+    expect(ensureIndicesMock).toHaveBeenCalled();
     expect(fetchLogsMock).toHaveBeenCalledWith(50);
   });
 });
