@@ -7,14 +7,14 @@ const { indexMock, ensureIndicesMock, findUserMock, hashPasswordMock } = vi.hois
   hashPasswordMock: vi.fn().mockResolvedValue('hashed'), // hashPassword()
 }));
 
-vi.mock('@/lib/elasticsearch', () => ({
+vi.mock('@/lib/ElasticSearch', () => ({
   __esModule: true,
   ensureIndices: ensureIndicesMock,
   findUser: findUserMock,
   USERS_INDEX: 'users',
   es: { index: indexMock },
 }));
-vi.mock('@/lib/auth', () => ({
+vi.mock('@/lib/Auth', () => ({
   __esModule: true,
   hashPassword: hashPasswordMock,
 }));
@@ -31,14 +31,14 @@ vi.mock('@/lib/Auth', () => ({
   hashPassword: hashPasswordMock,
 }));
 
-vi.mock('../lib/elasticsearch', () => ({
+vi.mock('../lib/ElasticSearch', () => ({
   __esModule: true,
   ensureIndices: ensureIndicesMock,
   findUser: findUserMock,
   USERS_INDEX: 'users',
   es: { index: indexMock },
 }));
-vi.mock('../lib/auth', () => ({
+vi.mock('../lib/Auth', () => ({
   __esModule: true,
   hashPassword: hashPasswordMock,
 }));

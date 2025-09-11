@@ -7,22 +7,22 @@ const { ensureIndicesMock, logVerificationMock, getSessionMock } = vi.hoisted(()
   getSessionMock: vi.fn(),
 }));
 
-vi.mock('@/lib/elasticsearch', () => ({
+vi.mock('@/lib/ElasticSearch', () => ({
   __esModule: true,
   ensureIndices: ensureIndicesMock,
   logVerification: logVerificationMock,
 }));
-vi.mock('@/lib/session', () => ({
+vi.mock('@/lib/Session', () => ({
   __esModule: true,
   getSession: getSessionMock,
 }));
 
-vi.mock('../lib/elasticsearch', () => ({
+vi.mock('../lib/ElasticSearch', () => ({
   __esModule: true,
   ensureIndices: ensureIndicesMock,
   logVerification: logVerificationMock,
 }));
-vi.mock('../lib/session', () => ({
+vi.mock('../lib/Session', () => ({
   __esModule: true,
   getSession: getSessionMock,
 }));

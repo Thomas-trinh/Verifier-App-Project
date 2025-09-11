@@ -17,16 +17,16 @@ const {
   rateLimitLoginMock: vi.fn().mockReturnValue({ allowed: true, retryAfterSec: 0 }),
 }));
 
-vi.mock('@/lib/elasticsearch', () => ({
+vi.mock('@/lib/Elasticsearch', () => ({
   __esModule: true,
   ensureIndices: ensureIndicesMock,
   findUser: findUserMock,
 }));
-vi.mock('@/lib/auth', () => ({
+vi.mock('@/lib/Auth', () => ({
   __esModule: true,
   comparePassword: comparePasswordMock,
 }));
-vi.mock('@/lib/rateLimit', () => ({
+vi.mock('@/lib/RateLimit', () => ({
   __esModule: true,
   getClientIp: getClientIpMock,
   rateLimitLogin: rateLimitLoginMock,
@@ -47,16 +47,16 @@ vi.mock('@/lib/RateLimit', () => ({
   rateLimitLogin: rateLimitLoginMock,
 }));
 
-vi.mock('../lib/elasticsearch', () => ({
+vi.mock('../lib/ElasticSearch', () => ({
   __esModule: true,
   ensureIndices: ensureIndicesMock,
   findUser: findUserMock,
 }));
-vi.mock('../lib/auth', () => ({
+vi.mock('../lib/Auth', () => ({
   __esModule: true,
   comparePassword: comparePasswordMock,
 }));
-vi.mock('../lib/rateLimit', () => ({
+vi.mock('../lib/RateLimit', () => ({
   __esModule: true,
   getClientIp: getClientIpMock,
   rateLimitLogin: rateLimitLoginMock,

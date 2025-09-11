@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const FIVE_MIN_MS = 5 * 60 * 1000;
 
-describe('lib/rateLimit', () => {
+describe('lib/RateLimit', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-01-01T00:00:00Z'));

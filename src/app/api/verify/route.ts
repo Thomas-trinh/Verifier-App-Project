@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ensureIndices, logVerification } from '@/lib/elasticsearch';
-import { getSession } from '@/lib/session';
+import { ensureIndices, logVerification } from '@/lib/ElasticSearch';
+import { getSession } from '@/lib/Session';
 
 const VerifySchema = z.object({
   postcode: z.string().min(1),

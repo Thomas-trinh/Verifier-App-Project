@@ -6,22 +6,22 @@ const { ensureIndicesMock, fetchLogsMock, getSessionMock } = vi.hoisted(() => ({
   getSessionMock: vi.fn(),
 }));
 
-vi.mock('@/lib/elasticsearch', () => ({
+vi.mock('@/lib/ElasticSearch', () => ({
   __esModule: true,
   ensureIndices: ensureIndicesMock,
   fetchLogs: fetchLogsMock,
 }));
-vi.mock('@/lib/session', () => ({
+vi.mock('@/lib/Session', () => ({
   __esModule: true,
   getSession: getSessionMock,
 }));
 
-vi.mock('../lib/elasticsearch', () => ({
+vi.mock('../lib/ElasticSearch', () => ({
   __esModule: true,
   ensureIndices: ensureIndicesMock,
   fetchLogs: fetchLogsMock,
 }));
-vi.mock('../lib/session', () => ({
+vi.mock('../lib/Session', () => ({
   __esModule: true,
   getSession: getSessionMock,
 }));
