@@ -27,7 +27,6 @@ vi.mock('@/lib/auspost', () => ({
   validateAgainstAusPost: validateAgainstAusPostMock,
 }));
 
-// relative (tuỳ chọn)
 vi.mock('../lib/elasticsearch', () => ({
   __esModule: true,
   ensureIndices: ensureIndicesMock,

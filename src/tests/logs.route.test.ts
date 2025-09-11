@@ -1,4 +1,3 @@
-// src/tests/logs.route.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { ensureIndicesMock, fetchLogsMock, getSessionMock } = vi.hoisted(() => ({
