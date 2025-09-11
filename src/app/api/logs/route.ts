@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { ensureIndices, fetchLogs } from '@/lib/ElasticSearch';
-import { getSession } from '@/lib/Session';
+import { ensureIndices, fetchLogs } from '@/lib/elasticsearch';
+import { getSession } from '@/lib/session';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

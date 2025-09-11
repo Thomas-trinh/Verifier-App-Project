@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/Session';
+import { getSession } from '@/lib/session';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

@@ -2,9 +2,9 @@ import { startServerAndCreateNextHandler } from '@as-integrations/next';
 import { ApolloServer } from '@apollo/server';
 import { gql } from 'graphql-tag';
 import type { NextRequest } from 'next/server';
-import { ensureIndices, logVerification } from '@/lib/ElasticSearch';
-import { getSession } from '@/lib/Session';
-import { validateAgainstAusPost } from '@/lib/AusPost';
+import { ensureIndices, logVerification } from '@/lib/elasticsearch';
+import { getSession } from '@/lib/session';
+import { validateAgainstAusPost } from '@/lib/auspost';
 
 // ---- Debug switch -----------------------------------------------------------
 const DEBUG =
