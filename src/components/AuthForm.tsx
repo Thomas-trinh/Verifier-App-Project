@@ -4,32 +4,28 @@ import { useRouter } from 'next/navigation';
 
 type ApiResponse =
   | {
-    ok?: boolean;
-    error?: string;
-    fieldErrors?: Record<string, string[]>;
-    formErrors?: string[];
-    username?: string;
-  }
+      ok?: boolean;
+      error?: string;
+      fieldErrors?: Record<string, string[]>;
+      formErrors?: string[];
+      username?: string;
+    }
   | any;
 
 export default function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   const router = useRouter();
 
-  // Form state
   const [username, setU] = useState('');
   const [password, setP] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Error state (field-level + form-level)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [formErrors, setFormErrors] = useState<string[]>([]);
 
-  // Convenience flags
   const hasUErr = (fieldErrors.username?.length ?? 0) > 0;
   const hasPErr = (fieldErrors.password?.length ?? 0) > 0;
   const disabled = loading || !username || !password;
 
-  // Safely parse JSON even when body may be empty or non-JSON
   async function parseJSONSafe(res: Response): Promise<ApiResponse | null> {
     try {
       const text = await res.text();
@@ -41,6 +37,7 @@ export default function AuthForm({ mode }: { mode: 'login' | 'register' }) {
 
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
+    if (loading) return;
     setLoading(true);
     setFormErrors([]);
     setFieldErrors({});
@@ -49,31 +46,28 @@ export default function AuthForm({ mode }: { mode: 'login' | 'register' }) {
       const res = await fetch(`/api/auth/${mode}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username: username.trim(), password }),
       });
 
       const data = await parseJSONSafe(res);
 
       if (!res.ok || data?.ok === false) {
-        // Prefer detailed errors from backend
         if (data?.fieldErrors) setFieldErrors(data.fieldErrors);
 
         const msgs: string[] = [];
-        if (Array.isArray(data?.formErrors) && data.formErrors.length) {
-          msgs.push(...data.formErrors);
-        }
+        if (Array.isArray(data?.formErrors) && data.formErrors.length) msgs.push(...data.formErrors);
         if (data?.error) msgs.push(String(data.error));
-
         setFormErrors(msgs.length ? msgs : [`Request failed (${res.status})`]);
         return;
       }
 
       // Success navigation
       if (mode === 'login') {
-        await fetch('/api/auth/me', { cache: 'no-store', credentials: 'same-origin' });
-        router.refresh();
-        router.replace('/verifier');
+        // Hard navigation so middleware/RSC see the new cookie immediately
+        window.location.assign('/verifier');
       } else {
+        // After register, send to login (soft nav is fine here)
         router.replace('/login');
       }
     } catch (err: any) {
@@ -153,12 +147,23 @@ export default function AuthForm({ mode }: { mode: 'login' | 'register' }) {
           <button
             type="submit"
             disabled={disabled}
-            className={`w-full rounded-lg px-4 py-2.5 text-white transition-colors ${disabled ? 'bg-slate-300' : 'bg-slate-900 hover:bg-black'
-              }`}
+            className={`w-full rounded-lg px-4 py-2.5 text-white transition-colors ${
+              disabled ? 'bg-slate-300' : 'bg-slate-900 hover:bg-black'
+            }`}
             aria-busy={loading}
           >
             {loading ? 'Processing…' : mode === 'login' ? 'Login' : 'Register'}
           </button>
+
+          {formErrors.length > 0 && (
+            <div role="alert" className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <ul className="list-disc pl-5 space-y-1">
+                {formErrors.map((m, i) => (
+                  <li key={i}>{m}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     </form>
