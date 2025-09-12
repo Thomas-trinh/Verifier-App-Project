@@ -4,12 +4,12 @@ import { useRouter } from 'next/navigation';
 
 type ApiResponse =
   | {
-      ok?: boolean;
-      error?: string;
-      fieldErrors?: Record<string, string[]>;
-      formErrors?: string[];
-      username?: string;
-    }
+    ok?: boolean;
+    error?: string;
+    fieldErrors?: Record<string, string[]>;
+    formErrors?: string[];
+    username?: string;
+  }
   | any;
 
 export default function AuthForm({ mode }: { mode: 'login' | 'register' }) {
@@ -69,7 +69,13 @@ export default function AuthForm({ mode }: { mode: 'login' | 'register' }) {
       }
 
       // Success navigation
-      router.push(mode === 'login' ? '/verifier' : '/login');
+      if (mode === 'login') {
+        await fetch('/api/auth/me', { cache: 'no-store', credentials: 'same-origin' });
+        router.refresh();
+        router.replace('/verifier');
+      } else {
+        router.replace('/login');
+      }
     } catch (err: any) {
       setFormErrors([err?.message ?? 'Unexpected error']);
     } finally {
@@ -147,9 +153,8 @@ export default function AuthForm({ mode }: { mode: 'login' | 'register' }) {
           <button
             type="submit"
             disabled={disabled}
-            className={`w-full rounded-lg px-4 py-2.5 text-white transition-colors ${
-              disabled ? 'bg-slate-300' : 'bg-slate-900 hover:bg-black'
-            }`}
+            className={`w-full rounded-lg px-4 py-2.5 text-white transition-colors ${disabled ? 'bg-slate-300' : 'bg-slate-900 hover:bg-black'
+              }`}
             aria-busy={loading}
           >
             {loading ? 'Processing…' : mode === 'login' ? 'Login' : 'Register'}
