@@ -154,16 +154,6 @@ export default function AuthForm({ mode }: { mode: 'login' | 'register' }) {
           >
             {loading ? 'Processing…' : mode === 'login' ? 'Login' : 'Register'}
           </button>
-
-          {formErrors.length > 0 && (
-            <div role="alert" className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              <ul className="list-disc pl-5 space-y-1">
-                {formErrors.map((m, i) => (
-                  <li key={i}>{m}</li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
       </div>
     </form>
